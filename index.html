@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Barbearia Demo · Agende seu horário</title>
+<meta name="description" content="Agende seu corte online: escolha o serviço, o barbeiro e o horário em menos de 1 minuto.">
+<meta name="theme-color" content="#0E0E10">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='22' fill='%230E0E10'/%3E%3Ctext x='50' y='66' font-family='Arial' font-size='46' font-weight='700' fill='%23C9A25B' text-anchor='middle'%3EB%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* =========================================================
+     DEMO BARBEARIA · PR Sites
+     Base: sistema de agendamento da Mariana Duarte (mesmo fluxo
+     de etapas, calendário e horários), versão sem servidor:
+     os dados ficam só no celular de quem testa.
+     Pra personalizar pra um cliente, edite o CONFIG no <script>
+     ou use o link: ?nome=Fefu%20Barbearia&cor=C9A25B
+     ========================================================= */
+  :root{
+    --bg:#0E0E10;
+    --bg-2:#141417;
+    --surface:#1A1A1E;
+    --surface-2:#222227;
+    --ink:#F3EFE7;
+    --ink-soft:#A39E95;
+    --accent:#C9A25B;
+    --accent-ink:#0E0E10;
+    --accent-soft:rgba(201,162,91,.14);
+    --ok:#5FB37A;
+    --danger:#E06363;
+    --line:#2A2A30;
+    --line-strong:#3A3A42;
+    --radius:16px;
+    --radius-sm:11px;
+    --ease-out:cubic-bezier(.16,1,.3,1);
+    --ease-in:cubic-bezier(.4,0,1,1);
+  }
+  *{box-sizing:border-box;}
+  html{-webkit-text-size-adjust:100%;scroll-behavior:smooth;}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:'Manrope',system-ui,sans-serif;font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent;}
+  button,a,input{touch-action:manipulation;font-family:inherit;}
+  :focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:10px;}
+  .app{max-width:520px;margin:0 auto;min-height:100dvh;padding-bottom:calc(40px + env(safe-area-inset-bottom));}
+
+  .demo-bar{background:var(--accent);color:var(--accent-ink);font-size:12px;font-weight:700;text-align:center;padding:7px 12px;letter-spacing:.2px;}
+
+  /* ---------- Topo ---------- */
+  .hero{position:relative;padding:34px 22px 26px;text-align:center;overflow:hidden;border-bottom:1px solid var(--line);
+    background:radial-gradient(120% 80% at 50% 0%,rgba(201,162,91,.16),transparent 60%),var(--bg);}
+  .pole{width:10px;height:54px;margin:0 auto 14px;border-radius:6px;
+    background:repeating-linear-gradient(135deg,var(--accent) 0 7px,var(--ink) 7px 14px,#7a1f25 14px 21px,var(--ink) 21px 28px);
+    background-size:100% 40px;animation:pole 2.4s linear infinite;box-shadow:0 0 0 3px var(--surface),0 0 0 4px var(--line-strong);}
+  @keyframes pole{to{background-position:0 40px;}}
+  .brand{font-family:'Oswald',sans-serif;font-weight:700;font-size:34px;letter-spacing:1.5px;text-transform:uppercase;margin:0;line-height:1.05;}
+  .brand-sub{margin:6px 0 0;color:var(--ink-soft);font-size:13.5px;}
+  .hero-info{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px;}
+  .chip{display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:6px 12px;font-size:12.5px;font-weight:600;text-decoration:none;}
+  .chip svg{width:14px;height:14px;color:var(--accent);}
+
+  /* ---------- Galeria ---------- */
+  .gallery{display:flex;gap:10px;overflow-x:auto;padding:18px 22px 4px;scroll-snap-type:x mandatory;scrollbar-width:none;}
+  .gallery::-webkit-scrollbar{display:none;}
+  .shot{flex:0 0 132px;height:168px;border-radius:14px;scroll-snap-align:start;position:relative;overflow:hidden;border:1px solid var(--line);}
+  .shot span{position:absolute;left:10px;bottom:9px;font-size:11.5px;font-weight:700;background:rgba(0,0,0,.55);padding:3px 8px;border-radius:999px;}
+  .shot svg{position:absolute;inset:0;margin:auto;width:56px;height:56px;opacity:.85;}
+
+  /* ---------- Abas ---------- */
+  .tabs{display:flex;gap:6px;margin:18px 22px 0;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:4px;}
+  .tab{flex:1;text-align:center;padding:9px 6px;border-radius:999px;font-size:13px;font-weight:700;color:var(--ink-soft);cursor:pointer;border:0;background:none;transition:background .2s,color .2s;}
+  .tab.active{background:var(--accent);color:var(--accent-ink);}
+
+  .view{padding:22px;}
+  .hidden{display:none !important;}
+
+  /* ---------- Etapas ---------- */
+  .steps{display:flex;gap:6px;margin-bottom:20px;}
+  .step-dot{flex:1;height:4px;border-radius:4px;background:var(--line);transition:background .3s;}
+  .step-dot.active{background:var(--accent);}
+  .step-panel{animation:in .38s var(--ease-out) both;}
+  @keyframes in{from{opacity:0;transform:translateX(22px);}}
+  .section-title{font-family:'Oswald',sans-serif;font-weight:600;font-size:22px;letter-spacing:.5px;text-transform:uppercase;margin:0 0 4px;}
+  .section-hint{color:var(--ink-soft);font-size:13.5px;margin:0 0 16px;}
+
+  .list{display:flex;flex-direction:column;gap:10px;}
+  .card{display:flex;align-items:center;gap:14px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;cursor:pointer;text-align:left;color:inherit;width:100%;
+    transition:transform .14s var(--ease-out),border-color .2s,background .2s;}
+  .card:active{transform:scale(.985);}
+  .card:hover{border-color:var(--line-strong);}
+  .card.selected{border-color:var(--accent);background:var(--accent-soft);}
+  .icon{flex:0 0 42px;height:42px;border-radius:12px;background:var(--surface-2);display:grid;place-items:center;color:var(--accent);}
+  .icon svg{width:22px;height:22px;}
+  .card-info{flex:1;min-width:0;}
+  .card-name{font-weight:700;font-size:15px;}
+  .card-meta{color:var(--ink-soft);font-size:12.5px;}
+  .card-price{font-family:'Oswald',sans-serif;font-weight:600;font-size:18px;color:var(--accent);white-space:nowrap;}
+  .tag{display:inline-block;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.4px;background:var(--accent);color:var(--accent-ink);border-radius:6px;padding:1px 6px;margin-left:6px;vertical-align:2px;}
+  .avatar{flex:0 0 46px;height:46px;border-radius:50%;display:grid;place-items:center;font-family:'Oswald',sans-serif;font-weight:600;font-size:18px;color:var(--accent-ink);}
+
+  /* ---------- Calendário ---------- */
+  .cal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .cal-nav{width:38px;height:38px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:20px;cursor:pointer;}
+  .cal-nav:disabled{opacity:.3;cursor:default;}
+  .cal-month-label{font-weight:800;text-transform:capitalize;}
+  .cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;}
+  .cal-wd{text-align:center;font-size:11px;font-weight:700;color:var(--ink-soft);padding-bottom:4px;}
+  .cal-day{aspect-ratio:1;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px;cursor:pointer;}
+  .cal-day.off{opacity:.25;cursor:default;background:transparent;}
+  .cal-day.today{border-color:var(--accent);}
+  .cal-day.sel{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+  .cal-day.empty{visibility:hidden;}
+
+  .time-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;}
+  .time{padding:11px 0;border-radius:11px;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-weight:700;font-size:14px;cursor:pointer;}
+  .time:disabled{opacity:.25;text-decoration:line-through;cursor:default;}
+  .time.sel{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);}
+  .empty-note{color:var(--ink-soft);font-size:13.5px;text-align:center;padding:18px 0;}
+
+  /* ---------- Formulário e resumo ---------- */
+  .summary-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-size:14px;}
+  .summary-row{display:flex;justify-content:space-between;gap:10px;padding:4px 0;}
+  .summary-row span:first-child{color:var(--ink-soft);}
+  .summary-row b{text-align:right;}
+  .field{margin-bottom:12px;}
+  .field label{display:block;font-size:12.5px;font-weight:700;color:var(--ink-soft);margin-bottom:5px;}
+  .field input{width:100%;padding:13px 14px;border-radius:var(--radius-sm);border:1px solid var(--line-strong);background:var(--bg-2);color:var(--ink);font-size:16px;}
+  .field input:focus{outline:none;border-color:var(--accent);}
+  .error{color:var(--danger);font-size:13px;margin:-4px 0 10px;}
+
+  .btn-row{display:flex;gap:10px;margin-top:18px;}
+  .btn{flex:1;padding:14px 16px;border-radius:999px;border:0;background:var(--accent);color:var(--accent-ink);font-weight:800;font-size:14.5px;cursor:pointer;text-align:center;text-decoration:none;transition:transform .14s var(--ease-out),opacity .2s;}
+  .btn:active{transform:scale(.97);}
+  .btn-ghost{background:transparent;color:var(--ink);border:1px solid var(--line-strong);}
+  .btn-wa{background:#25D366;color:#06210f;}
+
+  .confirm-wrap{text-align:center;}
+  .confirm-icon{width:72px;height:72px;border-radius:50%;margin:6px auto 14px;display:grid;place-items:center;background:var(--accent);color:var(--accent-ink);font-size:34px;font-weight:800;animation:pop .5s cubic-bezier(.34,1.45,.64,1) both;}
+  @keyframes pop{from{transform:scale(.4);opacity:0;}}
+  .confirm-title{font-family:'Oswald',sans-serif;text-transform:uppercase;font-size:26px;margin:0;}
+  .confirm-sub{color:var(--ink-soft);margin:4px 0 18px;}
+  .confirm-wrap .summary-card{text-align:left;}
+
+  /* ---------- Painel do barbeiro ---------- */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+  .stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px;text-align:center;}
+  .stat .num{font-family:'Oswald',sans-serif;font-size:22px;font-weight:600;color:var(--accent);}
+  .stat .lbl{font-size:11.5px;color:var(--ink-soft);}
+  .filter{display:flex;gap:6px;overflow-x:auto;margin-bottom:14px;scrollbar-width:none;}
+  .filter button{flex:0 0 auto;border:1px solid var(--line-strong);background:transparent;color:var(--ink);border-radius:999px;padding:7px 13px;font-size:12.5px;font-weight:700;cursor:pointer;}
+  .filter button.active{background:var(--ink);color:var(--bg);border-color:var(--ink);}
+  .day-label{font-size:12px;font-weight:800;color:var(--ink-soft);text-transform:uppercase;letter-spacing:.6px;margin:16px 0 8px;}
+  .appt{display:flex;gap:12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:11px 13px;margin-bottom:8px;}
+  .appt-time{font-family:'Oswald',sans-serif;font-size:18px;font-weight:600;min-width:52px;}
+  .appt-info{flex:1;min-width:0;font-size:13px;}
+  .appt-info b{font-size:14px;}
+  .appt-info .muted{color:var(--ink-soft);}
+  .appt-wa{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:#25D366;color:#06210f;text-decoration:none;}
+  .appt-wa svg{width:18px;height:18px;}
+  .new-badge{font-size:10px;font-weight:800;background:var(--ok);color:#06210f;border-radius:5px;padding:1px 5px;margin-left:5px;}
+
+  .note{color:var(--ink-soft);font-size:12px;text-align:center;margin-top:26px;line-height:1.6;}
+  .note a{color:var(--accent);}
+
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none !important;transition-duration:.01ms !important;}}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="demo-bar">Versão de demonstração · <span id="demo-credit">feito por PR Sites</span></div>
+
+  <header class="hero">
+    <div class="pole" aria-hidden="true"></div>
+    <h1 class="brand" id="brand-name">Barbearia Demo</h1>
+    <p class="brand-sub" id="brand-sub">Corte, barba e estilo · Rondonópolis</p>
+    <div class="hero-info">
+      <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span id="hours-label">Seg a sáb · 9h às 19h</span></span>
+      <a class="chip" id="addr-link" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 21s-7-6.2-7-11a7 7 0 0 1 14 0c0 4.8-7 11-7 11z"/><circle cx="12" cy="10" r="2.5"/></svg><span id="addr-label"></span></a>
+      <a class="chip" id="ig-link" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="1" fill="currentColor"/></svg><span id="ig-label"></span></a>
+    </div>
+  </header>
+
+  <div class="gallery" id="gallery" aria-label="Trabalhos"></div>
+
+  <div class="tabs" role="tablist">
+    <button class="tab active" data-tab="client" role="tab">Agendar</button>
+    <button class="tab" data-tab="pro" role="tab">Painel do barbeiro</button>
+  </div>
+
+  <!-- ================= CLIENTE ================= -->
+  <main class="view" id="view-client">
+    <div class="steps" id="steps">
+      <div class="step-dot active"></div><div class="step-dot"></div><div class="step-dot"></div><div class="step-dot"></div><div class="step-dot"></div>
+    </div>
+
+    <section class="step-panel" id="step-1">
+      <h2 class="section-title">Escolha o serviço</h2>
+      <p class="section-hint">Toque em uma opção pra continuar</p>
+      <div class="list" id="service-list"></div>
+    </section>
+
+    <section class="step-panel hidden" id="step-2">
+      <h2 class="section-title">Escolha o barbeiro</h2>
+      <p class="section-hint">Cada um tem a própria agenda</p>
+      <div class="list" id="barber-list"></div>
+      <div class="btn-row"><button class="btn btn-ghost" onclick="goStep(1)">Voltar</button></div>
+    </section>
+
+    <section class="step-panel hidden" id="step-3">
+      <h2 class="section-title">Escolha o dia</h2>
+      <p class="section-hint" id="days-hint">Até 30 dias de antecedência</p>
+      <div class="cal-header">
+        <button class="cal-nav" id="cal-prev" onclick="changeMonth(-1)" aria-label="Mês anterior">‹</button>
+        <div class="cal-month-label" id="cal-month-label"></div>
+        <button class="cal-nav" id="cal-next" onclick="changeMonth(1)" aria-label="Próximo mês">›</button>
+      </div>
+      <div class="cal-grid" id="cal-grid"></div>
+      <div class="btn-row"><button class="btn btn-ghost" onclick="goStep(2)">Voltar</button></div>
+    </section>
+
+    <section class="step-panel hidden" id="step-4">
+      <h2 class="section-title">Escolha o horário</h2>
+      <p class="section-hint" id="time-hint"></p>
+      <div class="time-grid" id="time-grid"></div>
+      <div class="btn-row"><button class="btn btn-ghost" onclick="goStep(3)">Voltar</button></div>
+    </section>
+
+    <section class="step-panel hidden" id="step-5">
+      <h2 class="section-title">Seus dados</h2>
+      <p class="section-hint">Último passo pra confirmar</p>
+      <div class="summary-card" id="booking-summary"></div>
+      <div class="field"><label for="input-name">Seu nome</label><input type="text" id="input-name" placeholder="Nome e sobrenome" autocomplete="name"></div>
+      <div class="field"><label for="input-phone">WhatsApp</label><input type="tel" id="input-phone" placeholder="(66) 90000-0000" inputmode="tel" autocomplete="tel-national"></div>
+      <div class="error" id="book-error"></div>
+      <div class="btn-row">
+        <button class="btn btn-ghost" onclick="goStep(4)">Voltar</button>
+        <button class="btn" onclick="confirmBooking()">Confirmar horário</button>
+      </div>
+    </section>
+
+    <section class="step-panel hidden" id="step-6">
+      <div class="confirm-wrap">
+        <div class="confirm-icon" aria-hidden="true">✓</div>
+        <h2 class="confirm-title">Horário marcado!</h2>
+        <p class="confirm-sub">Já está na agenda do barbeiro.</p>
+        <div class="summary-card" id="final-summary"></div>
+        <a class="btn btn-wa" id="wa-confirm" target="_blank" rel="noopener" style="display:block;">Receber confirmação no WhatsApp</a>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="switchTab('pro')">Ver no painel</button>
+          <button class="btn" onclick="resetFlow()">Marcar outro</button>
+        </div>
+      </div>
+    </section>
+
+    <p class="note">Demonstração: os horários marcados aqui ficam salvos só neste celular.<br>Quer um site assim pra sua barbearia? <a id="contact-link" target="_blank" rel="noopener">Fale com o Pedro</a></p>
+  </main>
+
+  <!-- ================= PAINEL ================= -->
+  <section class="view hidden" id="view-pro">
+    <h2 class="section-title">Agenda</h2>
+    <p class="section-hint">Tudo o que os clientes marcaram, sem precisar responder WhatsApp</p>
+    <div class="stats">
+      <div class="stat"><div class="num" id="stat-today">–</div><div class="lbl">hoje</div></div>
+      <div class="stat"><div class="num" id="stat-week">–</div><div class="lbl">próx. 7 dias</div></div>
+      <div class="stat"><div class="num" id="stat-revenue">–</div><div class="lbl">previsto 7d</div></div>
+    </div>
+    <div class="filter" id="pro-filter"></div>
+    <div id="agenda-list"></div>
+    <div class="btn-row"><button class="btn btn-ghost" onclick="resetDemo()">Limpar agendamentos de teste</button></div>
+  </section>
+</div>
+
+<script>
+/* =========================================================
+   CONFIG — é só isso que muda de um cliente pro outro
+   ========================================================= */
+const CONFIG = {
+  nome: 'Barbearia Demo',
+  slogan: 'Corte, barba e estilo · Rondonópolis',
+  endereco: 'Av. Exemplo, 123 · Centro',
+  instagram: 'barbeariademo',
+  whatsappBarbearia: '5512991722017',   // número que recebe as confirmações (com 55 + DDD)
+  whatsappPedro: '5512991722017',       // seu número: link "Fale com o Pedro"
+  corDestaque: '#C9A25B',
+  abre: 9, fecha: 19,                   // horário de funcionamento
+  intervalo: 30,                         // minutos entre horários
+  diasFechados: [0],                     // 0 = domingo, 1 = segunda...
+  diasAntecedencia: 30,
+  servicos: [
+    { id:'corte',   nome:'Corte',              duracao:40, preco:45, icone:'tesoura' },
+    { id:'barba',   nome:'Barba',              duracao:30, preco:35, icone:'navalha' },
+    { id:'combo',   nome:'Corte + Barba',      duracao:60, preco:70, icone:'combo', destaque:'Mais pedido' },
+    { id:'degrade', nome:'Degradê na navalha', duracao:50, preco:55, icone:'tesoura' },
+    { id:'sobrancelha', nome:'Sobrancelha',    duracao:15, preco:15, icone:'navalha' },
+    { id:'pigmentacao', nome:'Pigmentação',    duracao:30, preco:40, icone:'pincel' },
+    { id:'infantil', nome:'Corte infantil',    duracao:30, preco:35, icone:'tesoura' },
+  ],
+  barbeiros: [
+    { id:'joao',  nome:'João',  especialidade:'Degradê e navalhado', cor:'#C9A25B' },
+    { id:'lucas', nome:'Lucas', especialidade:'Barba e visagismo',  cor:'#8FB3C9' },
+    { id:'rafa',  nome:'Rafa',  especialidade:'Cortes clássicos',    cor:'#C98F8F' },
+  ],
+};
+
+/* Personalização rápida pelo link: ?nome=Fefu%20Barbearia&cor=C9A25B&ig=fefubarbearia */
+(function applyUrlParams(){
+  const p = new URLSearchParams(location.search);
+  if (p.get('nome')) CONFIG.nome = p.get('nome');
+  if (p.get('slogan')) CONFIG.slogan = p.get('slogan');
+  if (p.get('end')) CONFIG.endereco = p.get('end');
+  if (p.get('ig')) CONFIG.instagram = p.get('ig').replace('@','');
+  if (p.get('cor') && /^[0-9a-f]{6}$/i.test(p.get('cor'))) CONFIG.corDestaque = '#' + p.get('cor');
+})();
+
+/* ---------- ícones ---------- */
+const ICONS = {
+  tesoura:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12"/></svg>',
+  navalha:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17 14 6l4 4-11 11H3z"/><path d="M14 6l3-3 4 4-3 3"/></svg>',
+  combo:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8-4.3-4.1 5.9-.9z"/></svg>',
+  pincel:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 2l4 4-9 9-4-4z"/><path d="M9 11c-3 0-5 2-5 5 0 2-2 3-2 3s4 1 7-1c2-1.3 3-3 3-4"/></svg>',
+};
+const WA_ICON = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm5.3 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .1-3.3-.8-2.8-1.1-4.5-3.9-4.7-4.1-.1-.2-1.1-1.5-1.1-2.9s.7-2.1 1-2.4c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.4 0 .5l-.4.6-.4.4c-.1.1-.3.3-.1.6.2.3.8 1.3 1.7 2.1 1.2 1 2.1 1.3 2.4 1.5.3.1.5.1.6-.1l.9-1c.2-.3.4-.2.6-.1l1.9.9c.3.1.5.2.5.3.1.2.1.7-.1 1.4z"/></svg>';
+
+/* ---------- utilidades ---------- */
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2,'0');
+const brl = (v) => 'R$ ' + v.toFixed(0);
+const dateKey = (d) => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+const fromKey = (k) => { const [y,m,d] = k.split('-').map(Number); return new Date(y, m-1, d); };
+const minToHHMM = (m) => `${pad(Math.floor(m/60))}:${pad(m%60)}`;
+const WD = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+const fmtDay = (k) => { const d = fromKey(k); return `${WD[d.getDay()]}, ${pad(d.getDate())}/${pad(d.getMonth()+1)}`; };
+const svc = (id) => CONFIG.servicos.find(s => s.id === id);
+const barber = (id) => CONFIG.barbeiros.find(b => b.id === id);
+function hashStr(s){ let h = 2166136261; for (const c of s){ h ^= c.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+/* ---------- armazenamento (só neste aparelho) ---------- */
+const STORE_KEY = 'demo-barbearia-bookings';
+function loadBookings(){ try { return JSON.parse(localStorage.getItem(STORE_KEY)) || []; } catch(e){ return memBookings; } }
+let memBookings = [];
+function saveBookings(list){ memBookings = list; try { localStorage.setItem(STORE_KEY, JSON.stringify(list)); } catch(e){} }
+
+/* Agenda de exemplo: gera clientes fictícios pra agenda não parecer vazia */
+const FAKE_NAMES = ['Carlos M.','Gabriel S.','Matheus R.','Felipe A.','Diego L.','Bruno T.','Thiago P.','Vinícius C.','André F.','Leonardo B.','Rafael D.','Gustavo H.'];
+function fakeBookingsFor(dayK, barberId){
+  const d = fromKey(dayK);
+  if (CONFIG.diasFechados.includes(d.getDay())) return [];
+  const out = []; let seed = hashStr(dayK + barberId);
+  for (let m = CONFIG.abre*60; m < CONFIG.fecha*60; m += CONFIG.intervalo){
+    seed = (Math.imul(seed, 1103515245) + 12345) >>> 0;
+    const busy = (seed % 100) < (d.getDay() === 6 ? 32 : 16);   // sábado mais cheio
+    if (busy){
+      const s = CONFIG.servicos[seed % 3];
+      out.push({ id:'f'+dayK+barberId+m, day:dayK, start:m, service:s.id, barber:barberId, name:FAKE_NAMES[seed % FAKE_NAMES.length], phone:'', fake:true });
+      m += Math.ceil(s.duracao / CONFIG.intervalo) * CONFIG.intervalo - CONFIG.intervalo;
+    }
+  }
+  return out;
+}
+function bookingsFor(dayK, barberId){
+  const real = loadBookings().filter(b => b.day === dayK && (!barberId || b.barber === barberId));
+  const ids = barberId ? [barberId] : CONFIG.barbeiros.map(b => b.id);
+  return ids.flatMap(id => fakeBookingsFor(dayK, id)).concat(real).sort((a,b) => a.start - b.start);
+}
+
+/* ---------- estado do fluxo ---------- */
+const state = { step:1, service:null, barber:null, day:null, time:null, month:null };
+
+function goStep(n){
+  state.step = n;
+  for (let i = 1; i <= 6; i++) $('step-'+i).classList.toggle('hidden', i !== n);
+  document.querySelectorAll('.step-dot').forEach((el, i) => el.classList.toggle('active', i < Math.min(n,5)));
+  if (n === 3) renderCalendar();
+  if (n === 4) renderTimes();
+  if (n === 5) renderSummary();
+  window.scrollTo({ top: document.querySelector('.tabs').offsetTop - 10, behavior:'smooth' });
+}
+
+/* Etapa 1: serviços */
+function renderServices(){
+  $('service-list').innerHTML = CONFIG.servicos.map(s => `
+    <button class="card" onclick="pickService('${s.id}')">
+      <div class="icon">${ICONS[s.icone] || ICONS.tesoura}</div>
+      <div class="card-info">
+        <div class="card-name">${s.nome}${s.destaque ? `<span class="tag">${s.destaque}</span>` : ''}</div>
+        <div class="card-meta">${s.duracao} min</div>
+      </div>
+      <div class="card-price">${brl(s.preco)}</div>
+    </button>`).join('');
+}
+function pickService(id){ state.service = id; goStep(2); }
+
+/* Etapa 2: barbeiros */
+function renderBarbers(){
+  const anyone = `
+    <button class="card" onclick="pickBarber('any')">
+      <div class="avatar" style="background:var(--surface-2);color:var(--accent)">★</div>
+      <div class="card-info"><div class="card-name">Tanto faz</div><div class="card-meta">Primeiro horário livre de qualquer barbeiro</div></div>
+    </button>`;
+  $('barber-list').innerHTML = CONFIG.barbeiros.map(b => `
+    <button class="card" onclick="pickBarber('${b.id}')">
+      <div class="avatar" style="background:${b.cor}">${b.nome[0]}</div>
+      <div class="card-info"><div class="card-name">${b.nome}</div><div class="card-meta">${b.especialidade}</div></div>
+    </button>`).join('') + anyone;
+}
+function pickBarber(id){ state.barber = id; state.day = null; goStep(3); }
+
+/* Horários livres pra um barbeiro num dia */
+function freeSlots(dayK, barberId){
+  const dur = svc(state.service).duracao;
+  const busy = bookingsFor(dayK, barberId).map(b => [b.start, b.start + svc(b.service).duracao]);
+  const now = new Date(); const isToday = dayK === dateKey(now);
+  const nowMin = now.getHours()*60 + now.getMinutes();
+  const slots = [];
+  for (let m = CONFIG.abre*60; m + dur <= CONFIG.fecha*60; m += CONFIG.intervalo){
+    const clash = busy.some(([a,b]) => m < b && m + dur > a);
+    const past = isToday && m <= nowMin + 30;
+    slots.push({ m, free: !clash && !past });
+  }
+  return slots;
+}
+function slotsForState(dayK){
+  if (state.barber !== 'any') return freeSlots(dayK, state.barber).map(s => ({...s, barber: state.barber}));
+  const per = CONFIG.barbeiros.map(b => freeSlots(dayK, b.id).map(s => ({...s, barber:b.id})));
+  return per[0].map((s, i) => per.map(l => l[i]).find(x => x.free) || s);
+}
+
+/* Etapa 3: calendário */
+function renderCalendar(){
+  const today = new Date(); today.setHours(0,0,0,0);
+  const limit = new Date(today); limit.setDate(limit.getDate() + CONFIG.diasAntecedencia);
+  if (!state.month) state.month = new Date(today.getFullYear(), today.getMonth(), 1);
+  const y = state.month.getFullYear(), mo = state.month.getMonth();
+  $('cal-month-label').textContent = state.month.toLocaleDateString('pt-BR', { month:'long', year:'numeric' });
+  $('cal-prev').disabled = y === today.getFullYear() && mo === today.getMonth();
+  $('cal-next').disabled = new Date(y, mo+1, 1) > limit;
+  let html = WD.map(w => `<div class="cal-wd">${w[0]}</div>`).join('');
+  const first = new Date(y, mo, 1).getDay();
+  for (let i = 0; i < first; i++) html += '<div class="cal-day empty"></div>';
+  const days = new Date(y, mo+1, 0).getDate();
+  for (let d = 1; d <= days; d++){
+    const dt = new Date(y, mo, d); const k = dateKey(dt);
+    const closed = CONFIG.diasFechados.includes(dt.getDay());
+    const off = dt < today || dt > limit || closed || !slotsForState(k).some(s => s.free);
+    const cls = ['cal-day', off && 'off', k === dateKey(today) && 'today', k === state.day && 'sel'].filter(Boolean).join(' ');
+    html += `<button class="${cls}" ${off ? 'disabled' : `onclick="pickDay('${k}')"`}>${d}</button>`;
+  }
+  $('cal-grid').innerHTML = html;
+}
+function changeMonth(delta){ state.month = new Date(state.month.getFullYear(), state.month.getMonth() + delta, 1); renderCalendar(); }
+function pickDay(k){ state.day = k; goStep(4); }
+
+/* Etapa 4: horários */
+function renderTimes(){
+  const b = state.barber === 'any' ? 'qualquer barbeiro' : barber(state.barber).nome;
+  $('time-hint').textContent = `${fmtDay(state.day)} · ${b}`;
+  const slots = slotsForState(state.day);
+  $('time-grid').innerHTML = slots.some(s => s.free)
+    ? slots.map(s => `<button class="time" ${s.free ? `onclick="pickTime(${s.m},'${s.barber}')"` : 'disabled'}>${minToHHMM(s.m)}</button>`).join('')
+    : '<p class="empty-note" style="grid-column:1/-1">Sem horários livres nesse dia.</p>';
+}
+function pickTime(m, barberId){ state.time = m; state.assigned = barberId; goStep(5); }
+
+/* Etapa 5: resumo e confirmação */
+function summaryHTML(){
+  const s = svc(state.service);
+  return `
+    <div class="summary-row"><span>Serviço</span><b>${s.nome}</b></div>
+    <div class="summary-row"><span>Barbeiro</span><b>${barber(state.assigned).nome}</b></div>
+    <div class="summary-row"><span>Quando</span><b>${fmtDay(state.day)} às ${minToHHMM(state.time)}</b></div>
+    <div class="summary-row"><span>Valor</span><b>${brl(s.preco)}</b></div>`;
+}
+function renderSummary(){ $('booking-summary').innerHTML = summaryHTML(); $('book-error').textContent = ''; }
+function confirmBooking(){
+  const name = $('input-name').value.trim();
+  const phone = $('input-phone').value.replace(/\D/g,'');
+  if (name.length < 2) return $('book-error').textContent = 'Coloca seu nome pra gente saber quem é.';
+  if (phone.length < 10) return $('book-error').textContent = 'Confere o WhatsApp com DDD.';
+  const list = loadBookings();
+  list.push({ id:'r'+Date.now(), day:state.day, start:state.time, service:state.service, barber:state.assigned, name, phone, createdAt:Date.now() });
+  saveBookings(list);
+  $('final-summary').innerHTML = summaryHTML();
+  const s = svc(state.service);
+  const msg = `Olá! Acabei de agendar pelo site:\n${s.nome} com ${barber(state.assigned).nome}\n${fmtDay(state.day)} às ${minToHHMM(state.time)}\nNome: ${name}`;
+  $('wa-confirm').href = `https://wa.me/${CONFIG.whatsappBarbearia}?text=${encodeURIComponent(msg)}`;
+  goStep(6);
+}
+function resetFlow(){ Object.assign(state, { service:null, barber:null, day:null, time:null }); goStep(1); }
+
+/* ---------- Painel do barbeiro ---------- */
+let proFilter = 'all';
+function renderPro(){
+  const filters = [{id:'all', nome:'Todos'}, ...CONFIG.barbeiros];
+  $('pro-filter').innerHTML = filters.map(f => `<button class="${proFilter === f.id ? 'active' : ''}" onclick="proFilter='${f.id}';renderPro()">${f.nome}</button>`).join('');
+  const today = new Date(); today.setHours(0,0,0,0);
+  const bid = proFilter === 'all' ? null : proFilter;
+  let week = 0, revenue = 0, html = '';
+  for (let i = 0; i < 7; i++){
+    const d = new Date(today); d.setDate(d.getDate() + i); const k = dateKey(d);
+    const list = bookingsFor(k, bid);
+    week += list.length; revenue += list.reduce((t, b) => t + svc(b.service).preco, 0);
+    if (i === 0) $('stat-today').textContent = list.length;
+    if (!list.length) continue;
+    html += `<div class="day-label">${i === 0 ? 'Hoje' : i === 1 ? 'Amanhã' : fmtDay(k)} · ${list.length}</div>`;
+    html += list.map(b => {
+      const s = svc(b.service), br = barber(b.barber);
+      const wa = b.phone ? `<a class="appt-wa" href="https://wa.me/55${b.phone}" target="_blank" rel="noopener" aria-label="WhatsApp do cliente">${WA_ICON}</a>` : '';
+      return `<div class="appt" style="border-left-color:${br.cor}">
+        <div class="appt-time">${minToHHMM(b.start)}</div>
+        <div class="appt-info"><b>${b.name}</b>${b.fake ? '' : '<span class="new-badge">NOVO</span>'}<br><span class="muted">${s.nome} · ${br.nome} · ${brl(s.preco)}</span></div>
+        ${wa}</div>`;
+    }).join('');
+  }
+  $('stat-week').textContent = week;
+  $('stat-revenue').textContent = revenue >= 1000 ? 'R$ ' + (revenue/1000).toFixed(1).replace('.',',') + 'k' : brl(revenue);
+  $('agenda-list').innerHTML = html || '<p class="empty-note">Nenhum agendamento nos próximos dias.</p>';
+}
+function resetDemo(){ saveBookings([]); renderPro(); }
+
+/* ---------- Abas ---------- */
+function switchTab(t){
+  document.querySelectorAll('.tab').forEach(el => el.classList.toggle('active', el.dataset.tab === t));
+  $('view-client').classList.toggle('hidden', t !== 'client');
+  $('view-pro').classList.toggle('hidden', t !== 'pro');
+  if (t === 'pro') renderPro();
+}
+document.querySelectorAll('.tab').forEach(el => el.addEventListener('click', () => switchTab(el.dataset.tab)));
+
+/* ---------- Galeria (placeholders até ter as fotos do cliente) ---------- */
+function renderGallery(){
+  const items = [['Degradê','#2b2418'],['Barba','#1d2329'],['Social','#291d1d'],['Navalhado','#1f2620'],['Infantil','#26212b']];
+  $('gallery').innerHTML = items.map(([t, c], i) => `
+    <div class="shot" style="background:linear-gradient(160deg,${c},#0E0E10)">
+      <div style="color:var(--accent)">${Object.values(ICONS)[i % 4]}</div><span>${t}</span>
+    </div>`).join('');
+}
+
+/* ---------- Início ---------- */
+function applyBrand(){
+  document.documentElement.style.setProperty('--accent', CONFIG.corDestaque);
+  document.documentElement.style.setProperty('--accent-soft', CONFIG.corDestaque + '24');
+  document.title = `${CONFIG.nome} · Agende seu horário`;
+  $('brand-name').textContent = CONFIG.nome;
+  $('brand-sub').textContent = CONFIG.slogan;
+  const fechados = CONFIG.diasFechados.map(d => WD[d].toLowerCase()).join(', ');
+  $('hours-label').textContent = `${CONFIG.abre}h às ${CONFIG.fecha}h${fechados ? ' · fecha ' + fechados : ''}`;
+  $('addr-label').textContent = CONFIG.endereco;
+  $('addr-link').href = 'https://www.google.com/maps/search/' + encodeURIComponent(CONFIG.endereco + ' Rondonópolis');
+  $('ig-label').textContent = '@' + CONFIG.instagram;
+  $('ig-link').href = 'https://instagram.com/' + CONFIG.instagram;
+  $('contact-link').href = `https://wa.me/${CONFIG.whatsappPedro}?text=${encodeURIComponent('Oi Pedro! Vi a demo do site de barbearia e quero saber mais.')}`;
+  CONFIG.barbeiros[0].cor = CONFIG.corDestaque;
+}
+applyBrand(); renderGallery(); renderServices(); renderBarbers();
+</script>
+</body>
+</html>
